@@ -33,27 +33,3 @@ class FifoPnlCalculatorTests(unittest.TestCase):
         self.assertEqual(1145, pnl.at[d2, 'Realized'])
         self.assertEqual(-15, pnl.at[d2, 'Unrealized'])
         self.assertEqual(1130, pnl.at[d2, 'Total'])
-
-
-    def test_calculate_cumulative(self):
-        d1 = datetime(2020, 3, 25)
-        d2 = datetime(2020, 3, 26)
-
-        prices = HistPriceCollection()
-        prices.add(d1, 'DUMMY', 10)
-        prices.add(d2, 'DUMMY', 11)
-
-        data = {
-            'Date': [d1, d2],
-            'Ticker': ['DUMMY', 'DUMMY'],
-            'Way': ['Buy', 'Buy'],
-            'Quantity': [100, 50],
-            'Price': [9.5, 10.5],
-        }
-        trades = pd.DataFrame(data=data)
-        calc = FifoPnlCalculator()
-        pnl = calc.calculate(trades, prices, cumulative=True)
-
-        self.assertEqual(-1475, pnl.at[d2, 'Realized'])
-        self.assertEqual(225, pnl.at[d2, 'Unrealized'])
-        self.assertEqual(-1250, pnl.at[d2, 'Total'])

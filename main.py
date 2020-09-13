@@ -1,16 +1,14 @@
 from pnl import FifoPnlCalculator
 from trading import TestTradeLoader
 from mkt_data import TestPriceLoader
-from charts import pnl_plot
-from bokeh.plotting import curdoc
+from views.pnl import view_pnl
 
-trades = TestTradeLoader().load()
-prices = TestPriceLoader().load()
+trades_loader = TestTradeLoader()
+prices_loader = TestPriceLoader()
+calculator = FifoPnlCalculator()
 
-pnl_calc = FifoPnlCalculator()
-df = pnl_calc.calculate(trades, prices, cumulative=True)
+trades = trades_loader.load()
+prices = prices_loader.load()
 
-p = pnl_plot(df)
-
-curdoc().title = 'P&L Viewer'
-curdoc().add_root(p)
+pnl = calculator.calculate(trades, prices)
+view_pnl(pnl)

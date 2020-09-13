@@ -5,7 +5,7 @@ from trading import Trade, PositionManager
 class FifoPnlCalculator:
 
     @staticmethod
-    def calculate(trades, prices, cumulative=False):
+    def calculate(trades, prices):
         """
         Calculate realized, unrealized and total P&L using the First-In-First-Out methodology
 
@@ -13,7 +13,6 @@ class FifoPnlCalculator:
         ----------
         trades : DataFrame with the following columns: Date, Ticker, Way, Quantity, Price
         prices: HistPriceCollection
-        cumulative: returns cumulative daily P&L if true
 
         Returns
         -------
@@ -43,9 +42,6 @@ class FifoPnlCalculator:
             df.at[date, 'Unrealized'] += unreal_pnl
 
         df['Total'] = df['Realized'] + df['Unrealized']
-
-        if cumulative:
-            df = df.cumsum()
 
         return df
 
