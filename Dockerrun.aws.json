@@ -1,0 +1,14 @@
+{
+  "AWSEBDockerrunVersion": "1",
+  "Image": {
+    "Name": "rochejo/pnlviewer",
+    "Update": "true"
+  },
+  "Ports": [
+    {
+      "ContainerPort": 5006,
+      "HostPort": 5006
+    }
+  ],
+  "Logging": "/var/log/nginx"
+}
