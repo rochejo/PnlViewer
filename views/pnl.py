@@ -35,7 +35,6 @@ def pnl_chart(data):
             ('Total', '@Total{,}'),
         ],
         formatters={
-            'Date': 'datetime',
             'Realized': 'printf',
             'Unrealized': 'printf',
             'Total': 'printf'
