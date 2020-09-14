@@ -4,7 +4,7 @@ from views.pnl import pnl_chart
 from bokeh.plotting.figure import Figure
 import pandas as pd
 
-class PnlViewsTests(unittest.TestCase):
+class ViewsPnlTests(unittest.TestCase):
 
     def test_pnl_chart(self):
         data = {

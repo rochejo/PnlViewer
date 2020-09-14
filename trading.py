@@ -66,10 +66,10 @@ class Trade:
         return f"{self.way} {self.quantity} '{self.ticker}' @{self.price} ({self.date:%Y-%m-%d})"
 
 
-class TradeInventory:
-    def __init__(self, lifo=False):
+class TradeInventoryFIFO:
+    def __init__(self):
         self.trades = []
-        self._idx = -1 if lifo else 0
+        self._idx = 0
 
     def add_trade(self, trade):
         """
@@ -119,6 +119,12 @@ class TradeInventory:
 
         """
         return sum([(mark_price - t.price) * t.quantity * (1 if t.way == 'Buy' else -1) for t in self.trades])
+
+
+class TradeInventoryLIFO(TradeInventoryFIFO):
+    def __init__(self):
+        super().__init__()
+        self._idx = -1
 
 
 class PnlCalculator:

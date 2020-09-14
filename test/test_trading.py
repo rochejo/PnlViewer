@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime
 import pandas as pd
 from mkt_data import HistPriceCollection
-from trading import Trade, TestTradeLoader, TradeInventory, PnlCalculator
+from trading import Trade, TestTradeLoader, TradeInventoryFIFO, PnlCalculator
 
 
 class TestTradeLoaderTests(unittest.TestCase):
@@ -37,23 +37,23 @@ class TradeTests(unittest.TestCase):
             self.fail('ValueError not raised')
 
 
-class TradeInventoryTests(unittest.TestCase):
+class TradeInventoryFIFOTests(unittest.TestCase):
 
     def test_add_trade_buy(self):
-        pos = TradeInventory()
+        pos = TradeInventoryFIFO()
         pnl = pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10))
         self.assertEqual(0, pnl)
         self.assertEqual(1, len(pos.trades))
 
     def test_add_trade_buy_sell_flat(self):
-        pos = TradeInventory()
+        pos = TradeInventoryFIFO()
         pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10))
         pnl = pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Sell', 100, 12))
         self.assertEqual(200, pnl)
         self.assertEqual(0, len(pos.trades))
 
     def test_add_trade_buy_sell_decrease(self):
-        pos = TradeInventory()
+        pos = TradeInventoryFIFO()
         pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 50, 10))
         pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 50, 11))
         pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Sell', 80, 12))
@@ -61,7 +61,7 @@ class TradeInventoryTests(unittest.TestCase):
         self.assertEqual(20, sum([t.quantity for t in pos.trades]))
 
     def test_add_trade_buy_sell_flip(self):
-        pos = TradeInventory()
+        pos = TradeInventoryFIFO()
         pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 50, 10))
         pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Sell', 80, 12))
         self.assertEqual(1, len(pos.trades))
@@ -69,7 +69,7 @@ class TradeInventoryTests(unittest.TestCase):
         self.assertEqual(30, sum([t.quantity for t in pos.trades]))
 
     def test_add_trade_unrealized_pnl(self):
-        pos = TradeInventory()
+        pos = TradeInventoryFIFO()
         pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10))
         pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 50, 11))
         self.assertEqual(250, pos.unrealized_pnl(12))
@@ -93,7 +93,7 @@ class PnlCalculatorTests(unittest.TestCase):
             'Price': [9.5, 10.5, 11.5],
         }
         trades = pd.DataFrame(data=data)
-        calc = PnlCalculator(TradeInventory)
+        calc = PnlCalculator(TradeInventoryFIFO)
         pnl = calc.calculate(trades, prices)
 
         self.assertEqual(0, pnl.at[d1, 'Realized'])
