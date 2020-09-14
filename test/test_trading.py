@@ -1,6 +1,8 @@
 import unittest
 from datetime import datetime
-from trading import Trade, TestTradeLoader, PositionManager
+import pandas as pd
+from mkt_data import HistPriceCollection
+from trading import Trade, TestTradeLoader, TradeInventory, PnlCalculator
 
 
 class TestTradeLoaderTests(unittest.TestCase):
@@ -34,74 +36,70 @@ class TradeTests(unittest.TestCase):
         else:
             self.fail('ValueError not raised')
 
-    def test_cashflow_buy(self):
-        t = Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10)
-        self.assertEqual(-1000, t.cashflow())
 
-    def test_cashflow_sell(self):
-        t = Trade(datetime(2020, 3, 25), 'DUMMY', 'Sell', 100, 10)
-        self.assertEqual(1000, t.cashflow())
+class TradeInventoryTests(unittest.TestCase):
 
-    def test_mtm_pnl_buy(self):
-        t = Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10)
-        self.assertEqual(200, t.mtm_pnl(12))
+    def test_add_trade_buy(self):
+        pos = TradeInventory()
+        pnl = pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10))
+        self.assertEqual(0, pnl)
+        self.assertEqual(1, len(pos.trades))
 
-    def test_mtm_pnl_sell(self):
-        t = Trade(datetime(2020, 3, 25), 'DUMMY', 'Sell', 100, 10)
-        self.assertEqual(-200, t.mtm_pnl(12))
+    def test_add_trade_buy_sell_flat(self):
+        pos = TradeInventory()
+        pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10))
+        pnl = pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Sell', 100, 12))
+        self.assertEqual(200, pnl)
+        self.assertEqual(0, len(pos.trades))
+
+    def test_add_trade_buy_sell_decrease(self):
+        pos = TradeInventory()
+        pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 50, 10))
+        pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 50, 11))
+        pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Sell', 80, 12))
+        self.assertEqual(1, len(pos.trades))
+        self.assertEqual(20, sum([t.quantity for t in pos.trades]))
+
+    def test_add_trade_buy_sell_flip(self):
+        pos = TradeInventory()
+        pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 50, 10))
+        pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Sell', 80, 12))
+        self.assertEqual(1, len(pos.trades))
+        self.assertEqual('Sell', pos.trades[0].way)
+        self.assertEqual(30, sum([t.quantity for t in pos.trades]))
+
+    def test_add_trade_unrealized_pnl(self):
+        pos = TradeInventory()
+        pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10))
+        pos.add_trade(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 50, 11))
+        self.assertEqual(250, pos.unrealized_pnl(12))
 
 
-class PositionManagerTests(unittest.TestCase):
+class PnlCalculatorTests(unittest.TestCase):
 
-    def test_get_trades(self):
-        pos = PositionManager()
-        t = Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10)
-        pos.add_trade_fifo(t)
-        self.assertEqual(t, pos.get_trades('DUMMY')[0])
+    def test_calculate(self):
+        d1 = datetime(2020, 3, 25)
+        d2 = datetime(2020, 3, 26)
 
-    def test_get_trades_invalid_ticker(self):
-        self.assertIsNone(PositionManager().get_trades('XXX'))
+        prices = HistPriceCollection()
+        prices.add(d1, 'DUMMY', 10)
+        prices.add(d2, 'DUMMY', 12)
 
-    def test_has_position(self):
-        pos = PositionManager()
-        t = Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10)
-        pos.add_trade_fifo(t)
-        self.assertTrue(pos.has_position('DUMMY'))
+        data = {
+            'Date': [d1, d2, d2],
+            'Ticker': ['DUMMY', 'DUMMY', 'DUMMY'],
+            'Way': ['Buy', 'Sell', 'Buy'],
+            'Quantity': [100, 120, 10],
+            'Price': [9.5, 10.5, 11.5],
+        }
+        trades = pd.DataFrame(data=data)
+        calc = PnlCalculator(TradeInventory)
+        pnl = calc.calculate(trades, prices)
 
-    def test_has_position_invalid_ticker(self):
-        self.assertFalse(PositionManager().has_position('XXX'))
+        self.assertEqual(0, pnl.at[d1, 'Realized'])
+        self.assertEqual(50, pnl.at[d1, 'Unrealized'])
+        self.assertEqual(50, pnl.at[d1, 'Total'])
 
-    def test_add_trade_same_way(self):
-        pos = PositionManager()
-        t1 = Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10)
-        t2 = Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 50, 12)
-        pos.add_trade_fifo(t1)
-        pos.add_trade_fifo(t2)
-        self.assertEqual(2, len(pos.get_trades('DUMMY')))
-        self.assertEqual(150, sum([t.quantity for t in pos.get_trades('DUMMY')]))
-
-    def test_add_trade_flat(self):
-        pos = PositionManager()
-        t1 = Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10)
-        t2 = Trade(datetime(2020, 3, 25), 'DUMMY', 'Sell', 100, 12)
-        pos.add_trade_fifo(t1)
-        pos.add_trade_fifo(t2)
-        self.assertFalse(pos.has_position('DUMMY'))
-
-    def test_add_trade_decrease(self):
-        pos = PositionManager()
-        t1 = Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10)
-        t2 = Trade(datetime(2020, 3, 25), 'DUMMY', 'Sell', 20, 12)
-        pos.add_trade_fifo(t1)
-        pos.add_trade_fifo(t2)
-        self.assertEqual(1, len(pos.get_trades('DUMMY')))
-        self.assertEqual(Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 80, 10), pos.get_trades('DUMMY')[0])
-
-    def test_add_trade_flip(self):
-        pos = PositionManager()
-        t1 = Trade(datetime(2020, 3, 25), 'DUMMY', 'Buy', 100, 10)
-        t2 = Trade(datetime(2020, 3, 25), 'DUMMY', 'Sell', 120, 12)
-        pos.add_trade_fifo(t1)
-        pos.add_trade_fifo(t2)
-        self.assertEqual(1, len(pos.get_trades('DUMMY')))
-        self.assertEqual(Trade(datetime(2020, 3, 25), 'DUMMY', 'Sell', 20, 12), pos.get_trades('DUMMY')[0])
+        self.assertEqual(110, pnl.at[d2, 'Realized'])
+        self.assertEqual(-15, pnl.at[d2, 'Unrealized'])
+        self.assertEqual(95, pnl.at[d2, 'Total'])

@@ -1,11 +1,10 @@
-from pnl import FifoPnlCalculator
-from trading import TestTradeLoader
+from trading import TestTradeLoader, TradeInventory, PnlCalculator
 from mkt_data import TestPriceLoader
 from views.pnl import view_pnl
 
 trades_loader = TestTradeLoader()
 prices_loader = TestPriceLoader()
-calculator = FifoPnlCalculator()
+calculator = PnlCalculator(TradeInventory)
 
 trades = trades_loader.load()
 prices = prices_loader.load()
