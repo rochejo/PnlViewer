@@ -7,15 +7,12 @@ from bokeh.models.annotations import Title
 def pnl_chart(data):
     """
     Creates a chart to display P&L
-
     Parameters
     ----------
     data : DataFrame, with the following columns: Date, Realized, Unrealized, Total
-
     Returns
     -------
     Figure
-
     """
     source = ColumnDataSource(data.cumsum())
 
@@ -33,7 +30,6 @@ def pnl_chart(data):
 
     hover = HoverTool(
         tooltips=[
-            ('Date', '@Date'),
             ('Realized', '@Realized{,}'),
             ('Unrealized', '@Unrealized{,}'),
             ('Total', '@Total{,}'),
@@ -58,11 +54,9 @@ def pnl_chart(data):
 def view_pnl(data):
     """
     Render P&L chart
-
     Parameters
     ----------
     data : DataFrame, with the following columns: Date, Realized, Unrealized, Total
-
     """
     chart = pnl_chart(data)
     curdoc().title = 'P&L Viewer (beta)'
