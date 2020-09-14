@@ -7,9 +7,11 @@ from bokeh.models.annotations import Title
 def pnl_chart(data):
     """
     Creates a chart to display P&L
+
     Parameters
     ----------
     data : DataFrame, with the following columns: Date, Realized, Unrealized, Total
+
     Returns
     -------
     Figure
@@ -53,6 +55,7 @@ def pnl_chart(data):
 def view_pnl(data):
     """
     Render P&L chart
+
     Parameters
     ----------
     data : DataFrame, with the following columns: Date, Realized, Unrealized, Total

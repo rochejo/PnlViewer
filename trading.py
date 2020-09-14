@@ -81,7 +81,7 @@ class TradeInventoryFIFO:
 
         Returns
         -------
-        float
+        float, realized P&L
 
         """
 
@@ -115,7 +115,7 @@ class TradeInventoryFIFO:
 
         Returns
         -------
-        float
+        float, unrealized P&L
 
         """
         return sum([(mark_price - t.price) * t.quantity * (1 if t.way == 'Buy' else -1) for t in self.trades])
