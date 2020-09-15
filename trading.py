@@ -155,7 +155,7 @@ class PnlCalculator:
         DataFrame with the following columns: Date, Total, Realized, Unrealized
         """
 
-        # Dates from prices and from trades are combine in order to:
+        # Dates from prices and from trades are merged in order to:
         # 1. calculate unrealized P&L for days there is no trade
         # 2. capture missing price for days with trades
         dates = sorted(set().union(*[trades.Date.to_list(), prices.dates]))
@@ -166,8 +166,8 @@ class PnlCalculator:
             dtype=np.float)
         df.index.name = 'Date'
 
-        # Trades are grouped by date and traversed once to store them into a dict
-        # Assumption: trades are sorted for a given date because trade time not available
+        # Trades are grouped by date and traversed only once to store them into a dict
+        # Assumption: trades are sorted for a given date (trade time is not available)
         trades_by_date = {}
         for g in trades.groupby(['Date']):
             trades_by_date[g[0]] = [Trade(t.Date, t.Ticker, t.Way, t.Quantity, t.Price) for t in g[1].itertuples()]
@@ -178,12 +178,12 @@ class PnlCalculator:
 
         for date in dates:
 
-            # Calculate realized P&L by adding trade to inventory
+            # Calculate realized P&L by adding trades to current position
             if date in trades_by_date:
                 for trade in trades_by_date[date]:
                     real_pnl += pos[trade.ticker].add_trade(trade)
 
-            # Calculate unrealized P&L using outstanding inventory and close price
+            # Calculate unrealized P&L using outstanding position and close price
             unreal_pnl = sum([pos[ticker].unrealized_pnl(prices.get(date, ticker)) for ticker in pos.keys()])
 
             df.at[date, 'Realized'] = real_pnl
