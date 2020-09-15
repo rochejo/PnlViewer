@@ -1,5 +1,4 @@
 from os.path import join, dirname
-from dateutil import parser
 import pandas as pd
 
 
@@ -20,11 +19,12 @@ class CsvPriceLoader:
         self.path = csv_path
 
     def load(self):
-        hist = HistPriceCollection()
         df = pd.read_csv(self.path)
-        for _, row in df.iterrows():
-            hist.add(parser.parse(row['Date']), row['Ticker'], row['Closing Price'])
-        return hist
+        df.Date = pd.to_datetime(df.Date)
+        h = HistPriceCollection()
+        for row in df.itertuples():
+            h.add(row.Date, row.Ticker, row.ClosingPrice)
+        return h
 
 
 class TestPriceLoader(CsvPriceLoader):
@@ -59,6 +59,10 @@ class HistPriceCollection:
     """
     def __init__(self):
         self.data = {}
+
+    @property
+    def dates(self):
+        return self.data.keys()
 
     def add(self, date, ticker, price):
         if date not in self.data:

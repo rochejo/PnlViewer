@@ -4,19 +4,20 @@ from bokeh.models import HoverTool, NumeralTickFormatter, DatetimeTickFormatter
 from bokeh.models.annotations import Title
 
 
-def pnl_chart(data):
+def pnl_chart(df):
     """
     Creates a chart to display P&L
 
     Parameters
     ----------
-    data : DataFrame, with the following columns: Date, Realized, Unrealized, Total
+    df : DataFrame, with the following columns: Date, Realized, Unrealized, Total
 
     Returns
     -------
     Figure
     """
-    source = ColumnDataSource(data.cumsum())
+    source = ColumnDataSource(df)
+    source.add(df.index.map(lambda d: d.strftime('%d-%b-%y')), 'DateStr')
 
     title = Title(text='Historical Daily P&L', text_font_size='14pt', align = 'center')
 
@@ -32,6 +33,7 @@ def pnl_chart(data):
 
     hover = HoverTool(
         tooltips=[
+            ('Date', '@DateStr'),
             ('Realized', '@Realized{,}'),
             ('Unrealized', '@Unrealized{,}'),
             ('Total', '@Total{,}'),
@@ -52,14 +54,14 @@ def pnl_chart(data):
     return p
 
 
-def view_pnl(data):
+def view_pnl(df):
     """
     Render P&L chart
 
     Parameters
     ----------
-    data : DataFrame, with the following columns: Date, Realized, Unrealized, Total
+    df : DataFrame, with the following columns: Date, Realized, Unrealized, Total
     """
-    chart = pnl_chart(data)
+    chart = pnl_chart(df)
     curdoc().title = 'P&L Viewer (beta)'
     curdoc().add_root(chart)

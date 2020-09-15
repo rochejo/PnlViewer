@@ -1,4 +1,5 @@
 from os.path import join, dirname
+import numpy as np
 import pandas as pd
 
 
@@ -20,7 +21,7 @@ class CsvTradeLoader:
 
     def load(self):
         df = pd.read_csv(self.path)
-        df['Date'] = pd.to_datetime(df['Date'])
+        df.Date = pd.to_datetime(df.Date)
         return df
 
 
@@ -66,14 +67,17 @@ class Trade:
         return f"{self.way} {self.quantity} '{self.ticker}' @{self.price} ({self.date:%Y-%m-%d})"
 
 
-class TradeInventoryFIFO:
+class TradePositionFIFO:
     def __init__(self):
         self.trades = []
         self._idx = 0
 
+    def has_position(self):
+        return len(self.trades) > 0
+
     def add_trade(self, trade):
         """
-        Add trade to existing inventory and returns realized P&L
+        Add trade to existing position and returns realized P&L
 
         Parameters
         ----------
@@ -98,7 +102,7 @@ class TradeInventoryFIFO:
             return trade.quantity * (trade.price - t.price) * (1 if t.way == 'Buy' else -1)
 
         # Opposite way and qty is higher than existing trade --> existing trade is removed, qty is adjusted
-        pnl = trade.quantity * (trade.price - t.price) * (1 if t.way == 'Buy' else -1)
+        pnl = t.quantity * (trade.price - t.price) * (1 if t.way == 'Buy' else -1)
         trade.quantity -= t.quantity
         self.trades.pop(self._idx)
         if trade.quantity > 0:
@@ -121,7 +125,7 @@ class TradeInventoryFIFO:
         return sum([(mark_price - t.price) * t.quantity * (1 if t.way == 'Buy' else -1) for t in self.trades])
 
 
-class TradeInventoryLIFO(TradeInventoryFIFO):
+class TradePositionLIFO(TradePositionFIFO):
     def __init__(self):
         super().__init__()
         self._idx = -1
@@ -131,11 +135,11 @@ class PnlCalculator:
     """
     Parameters
     ----------
-    trades_inventory: class to handle trades inventory
+    trades_position_class: class to handle trades position/inventory and P&L
 
     """
-    def __init__(self, trades_inventory):
-        self.inventory = trades_inventory
+    def __init__(self, trades_position_class):
+        self.trades_position_class = trades_position_class
 
     def calculate(self, trades, prices):
         """
@@ -150,31 +154,41 @@ class PnlCalculator:
         -------
         DataFrame with the following columns: Date, Total, Realized, Unrealized
         """
-        df = pd.DataFrame(index=trades.Date.unique(), columns=['Total', 'Realized', 'Unrealized'])
+
+        # Dates from prices and from trades are combine in order to:
+        # 1. calculate unrealized P&L for days there is no trade
+        # 2. capture missing price for days with trades
+        dates = sorted(set().union(*[trades.Date.to_list(), prices.dates]))
+
+        df = pd.DataFrame(
+            index=dates,
+            columns=['Total', 'Realized', 'Unrealized'],
+            dtype=np.float)
         df.index.name = 'Date'
-        df = df.fillna(0)
-        positions =  {}
 
-        for grp in trades.groupby(['Date', 'Ticker']):
-            date = grp[0][0]
-            ticker = grp[0][1]
-            if ticker not in positions:
-                positions[ticker] = self.inventory()
-            pos = positions[ticker]
+        # Trades are grouped by date and traversed once to store them into a dict
+        # Assumption: trades are sorted for a given date because trade time not available
+        trades_by_date = {}
+        for g in trades.groupby(['Date']):
+            trades_by_date[g[0]] = [Trade(t.Date, t.Ticker, t.Way, t.Quantity, t.Price) for t in g[1].itertuples()]
 
-            real_pnl = 0
-            for _, row in grp[1].iterrows():
-                trade = Trade(row.Date, row.Ticker, row.Way, row.Quantity, row.Price)
-                real_pnl += pos.add_trade(trade)
+        pos = {ticker: self.trades_position_class() for ticker in trades.Ticker}
 
-            unreal_pnl = 0
-            if len(pos.trades) > 0:
-                close_price = prices.get(date, ticker)
-                unreal_pnl = pos.unrealized_pnl(close_price)
+        real_pnl = 0
 
-            df.at[date, 'Realized'] += real_pnl
-            df.at[date, 'Unrealized'] += unreal_pnl
+        for date in dates:
 
-        df['Total'] = df['Realized'] + df['Unrealized']
+            # Calculate realized P&L by adding trade to inventory
+            if date in trades_by_date:
+                for trade in trades_by_date[date]:
+                    real_pnl += pos[trade.ticker].add_trade(trade)
+
+            # Calculate unrealized P&L using outstanding inventory and close price
+            unreal_pnl = sum([pos[ticker].unrealized_pnl(prices.get(date, ticker)) for ticker in pos.keys()])
+
+            df.at[date, 'Realized'] = real_pnl
+            df.at[date, 'Unrealized'] = unreal_pnl
+
+        df.Total = df.Realized + df.Unrealized
 
         return df
